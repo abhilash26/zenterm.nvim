@@ -5,6 +5,38 @@ local utils = require("zenterm.utils")
 
 local M = {}
 
+-- Force kill terminal job and cleanup buffer
+local function force_cleanup(buf)
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  -- Get terminal job ID
+  local job_id = vim.b[buf].terminal_job_id
+
+  -- Stop the job if it's running
+  if job_id then
+    pcall(vim.fn.jobstop, job_id)
+  end
+
+  -- Force delete buffer
+  pcall(vim.api.nvim_buf_delete, buf, { force = true })
+end
+
+-- Setup cleanup autocommand
+function M.setup_cleanup()
+  vim.api.nvim_create_autocmd("VimLeavePre", {
+    group = vim.api.nvim_create_augroup("ZenTermCleanup", { clear = true }),
+    callback = function()
+      local buf, _ = state.get_last_term()
+      if buf then
+        force_cleanup(buf)
+      end
+      state.clear()
+    end,
+  })
+end
+
 -- Create or toggle terminal
 function M.toggle(mode)
   local conf = config.get()
@@ -57,7 +89,7 @@ function M.toggle(mode)
 
   -- Start terminal if not already started
   if vim.bo[buf].buftype ~= "terminal" then
-    vim.fn.termopen(vim.o.shell, {
+    local job_id = vim.fn.termopen(vim.o.shell, {
       on_exit = function()
         if conf.close_on_exit then
           vim.schedule(function()
@@ -69,6 +101,11 @@ function M.toggle(mode)
         end
       end,
     })
+
+    -- Store job ID in buffer variable for cleanup
+    if job_id > 0 then
+      vim.b[buf].terminal_job_id = job_id
+    end
   end
 
   -- Auto insert mode

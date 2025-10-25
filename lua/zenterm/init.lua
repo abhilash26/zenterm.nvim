@@ -24,6 +24,9 @@ function M.setup(opts)
   -- Setup configuration
   config.setup(opts)
 
+  -- Setup cleanup hooks
+  terminal.setup_cleanup()
+
   -- Setup commands
   commands.setup()
 
